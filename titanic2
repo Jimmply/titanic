@@ -1,0 +1,53 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.impute import SimpleImputer
+from xgboost import XGBClassifier
+from sklearn.feature_selection import SelectFromModel
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import joblib
+
+titanic_data = pd.read_csv('https://web.stanford.edu/class/archive/cs/cs109/cs109.1166/stuff/titanic.csv')
+
+print(titanic_data.head())
+
+X = titanic_data.drop(['Survived', 'Name', 'Ticket', 'Cabin'], axis=1)
+y = titanic_data['Survived']  # Target variable
+
+X = pd.get_dummies(X, columns=['Sex', 'Embarked'], drop_first=True)
+
+imputer = SimpleImputer(strategy='mean')
+X_imputed = imputer.fit_transform(X)
+
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+feature_selector = SelectFromModel(XGBClassifier())
+X_train_selected = feature_selector.fit_transform(X_train_scaled, y_train)
+X_test_selected = feature_selector.transform(X_test_scaled)
+
+model = RandomForestClassifier(random_state=42)
+
+param_grid = {
+    'n_estimators': [100, 200, 300],
+    'max_depth': [None, 10, 20],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4]
+}
+
+grid_search = GridSearchCV(model, param_grid=param_grid, cv=5, scoring='accuracy', verbose=2, n_jobs=-1)
+grid_search.fit(X_train_selected, y_train)
+
+print("Best Parameters:", grid_search.best_params_)
+
+y_pred = grid_search.predict(X_test_selected)
+
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("\nClassification Report:\n", classification_report(y_test, y_pred))
+print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred))
+
+best_model = grid_search.best_estimator_
+joblib.dump(best_model, 'titanic_survival_model.pkl')
