@@ -1,0 +1,58 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
+import pickle
+
+# Load the Titanic dataset
+titanic_data = pd.read_csv('https://web.stanford.edu/class/archive/cs/cs109/cs109.1166/stuff/titanic.csv')
+
+# Display the first few rows of the dataset
+print(titanic_data.head())
+
+# Separate features and target variable
+X = titanic_data.drop('Survived', axis=1)  # Features
+y = titanic_data['Survived']  # Target variable
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+# Define categorical and numerical features
+categorical_features = ['Pclass', 'Sex', 'Embarked']
+numerical_features = ['Age', 'SibSp', 'Parch', 'Fare']
+
+# Handling missing values
+X_train[numerical_features] = X_train[numerical_features].fillna(X_train[numerical_features].mean())
+X_test[numerical_features] = X_test[numerical_features].fillna(X_test[numerical_features].mean())
+
+X_train[categorical_features] = X_train[categorical_features].fillna(X_train[categorical_features].mode().iloc[0])
+X_test[categorical_features] = X_test[categorical_features].fillna(X_test[categorical_features].mode().iloc[0])
+
+# Convert categorical features to numerical using one-hot encoding
+X_train = pd.get_dummies(X_train, columns=categorical_features)
+X_test = pd.get_dummies(X_test, columns=categorical_features)
+
+# Define the CatBoost model
+catboost_model = CatBoostClassifier(iterations=100, depth=5, learning_rate=0.1, random_state=42, verbose=0)
+
+# Train the CatBoost model
+catboost_model.fit(X_train, y_train)
+
+# Define the LightGBM model
+lgbm_model = LGBMClassifier(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42)
+
+# Train the LightGBM model
+lgbm_model.fit(X_train, y_train)
+
+# Evaluate models on the test set
+catboost_y_pred = catboost_model.predict(X_test)
+lgbm_y_pred = lgbm_model.predict(X_test)
+
+# Display evaluation metrics for CatBoost
+catboost_accuracy = np.mean(catboost_y_pred == y_test)
+print("CatBoost Accuracy:", catboost_accuracy)
+
+# Display evaluation metrics for LightGBM
+lgbm_accuracy = np.mean(lgbm_y_pred == y_test)
+print("LightGBM Accuracy:", lgbm_accuracy)
