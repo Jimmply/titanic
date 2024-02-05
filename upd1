@@ -1,0 +1,116 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+# Load the Titanic dataset
+titanic_data = pd.read_csv('https://web.stanford.edu/class/archive/cs/cs109/cs109.1166/stuff/titanic.csv')
+
+# Display basic information about the dataset
+print("Dataset Information:")
+print(titanic_data.info())
+
+# Define categorical and numerical features
+categorical_features = ['Pclass', 'Sex', 'Embarked']
+numerical_features = ['Age', 'SibSp', 'Parch', 'Fare']
+
+# Create a preprocessor for handling missing values and categorical features
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', SimpleImputer(strategy='mean'), numerical_features),
+        ('cat', Pipeline(steps=[
+            ('imputer', SimpleImputer(strategy='most_frequent')),
+            ('onehot', OneHotEncoder(handle_unknown='ignore'))
+        ]), categorical_features)
+    ])
+
+# Create pipelines with preprocessing steps and classifiers
+rf_model = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('classifier', RandomForestClassifier(random_state=42))
+])
+
+catboost_model = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('classifier', CatBoostClassifier(random_state=42, verbose=False))
+])
+
+lgbm_model = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('classifier', LGBMClassifier(random_state=42))
+])
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(
+    titanic_data.drop('Survived', axis=1),
+    titanic_data['Survived'],
+    test_size=0.2,
+    random_state=42,
+    stratify=titanic_data['Survived']
+)
+
+# Define hyperparameters for tuning
+rf_param_grid = {
+    'classifier__n_estimators': [50, 100, 200],
+    'classifier__max_depth': [3, 5, 7],
+}
+
+catboost_param_grid = {
+    'classifier__iterations': [50, 100, 200],
+    'classifier__depth': [3, 5, 7],
+    'classifier__learning_rate': [0.01, 0.1, 0.2]
+}
+
+lgbm_param_grid = {
+    'classifier__n_estimators': [50, 100, 200],
+    'classifier__max_depth': [3, 5, 7],
+    'classifier__learning_rate': [0.01, 0.1, 0.2]
+}
+
+# Perform GridSearchCV for hyperparameter tuning
+rf_grid_search = GridSearchCV(rf_model, param_grid=rf_param_grid, cv=5, scoring='accuracy', verbose=2, n_jobs=-1)
+catboost_grid_search = GridSearchCV(catboost_model, param_grid=catboost_param_grid, cv=5, scoring='accuracy', verbose=2, n_jobs=-1)
+lgbm_grid_search = GridSearchCV(lgbm_model, param_grid=lgbm_param_grid, cv=5, scoring='accuracy', verbose=2, n_jobs=-1)
+
+rf_grid_search.fit(X_train, y_train)
+catboost_grid_search.fit(X_train, y_train)
+lgbm_grid_search.fit(X_train, y_train)
+
+# Display the best parameters for each model
+print("Random Forest Best Parameters:", rf_grid_search.best_params_)
+print("CatBoost Best Parameters:", catboost_grid_search.best_params_)
+print("LGBM Best Parameters:", lgbm_grid_search.best_params_)
+
+# Evaluate models on the test set
+rf_y_pred = rf_grid_search.predict(X_test)
+catboost_y_pred = catboost_grid_search.predict(X_test)
+lgbm_y_pred = lgbm_grid_search.predict(X_test)
+
+# Display evaluation metrics for Random Forest
+rf_accuracy = accuracy_score(y_test, rf_y_pred)
+print("\nRandom Forest Accuracy:", rf_accuracy)
+print("\nRandom Forest Classification Report:\n", classification_report(y_test, rf_y_pred))
+print("\nRandom Forest Confusion Matrix:\n", confusion_matrix(y_test, rf_y_pred))
+
+# Display evaluation metrics for CatBoost
+catboost_accuracy = accuracy_score(y_test, catboost_y_pred)
+print("\nCatBoost Accuracy:", catboost_accuracy)
+print("\nCatBoost Classification Report:\n", classification_report(y_test, catboost_y_pred))
+print("\nCatBoost Confusion Matrix:\n", confusion_matrix(y_test, catboost_y_pred))
+
+# Display evaluation metrics for LGBM
+lgbm_accuracy = accuracy_score(y_test, lgbm_y_pred)
+print("\nLGBM Accuracy:", lgbm_accuracy)
+print("\nLGBM Classification Report:\n", classification_report(y_test, lgbm_y_pred))
+print("\nLGBM Confusion Matrix:\n", confusion_matrix(y_test, lgbm_y_pred))
+
+# Display classification report and confusion matrix
+print("\nClassification Report:\n", classification_report(y_test, y_pred))
+print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred))
