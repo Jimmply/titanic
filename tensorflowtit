@@ -1,1 +1,73 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+
+# Load the Titanic dataset
+titanic_data = pd.read_csv('https://web.stanford.edu/class/archive/cs/cs109/cs109.1166/stuff/titanic.csv')
+
+# Display basic information about the dataset
+print("Dataset Information:")
+print(titanic_data.info())
+
+# Define categorical and numerical features
+categorical_features = ['Pclass', 'Sex', 'Embarked']
+numerical_features = ['Age', 'SibSp', 'Parch', 'Fare']
+
+# Create a preprocessor for handling missing values and categorical features
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', SimpleImputer(strategy='mean'), numerical_features),
+        ('cat', Pipeline(steps=[
+            ('imputer', SimpleImputer(strategy='most_frequent')),
+            ('onehot', OneHotEncoder(handle_unknown='ignore'))
+        ]), categorical_features)
+    ])
+
+# Create a pipeline with preprocessing steps
+pipeline = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+])
+
+# Preprocess the data and split into features and target variable
+X = pipeline.fit_transform(titanic_data.drop('Survived', axis=1))
+y = titanic_data['Survived']
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+# Standardize the features
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Build a neural network model using Keras
+model = Sequential([
+    Dense(64, activation='relu', input_dim=X_train_scaled.shape[1]),
+    Dense(32, activation='relu'),
+    Dense(1, activation='sigmoid')
+])
+
+# Compile the model
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+# Train the model
+model.fit(X_train_scaled, y_train, epochs=50, batch_size=32, validation_split=0.1, verbose=2)
+
+# Evaluate the model on the test set
+y_pred_prob = model.predict(X_test_scaled)
+y_pred = (y_pred_prob > 0.5).astype(int)
+
+# Display evaluation metrics for TensorFlow model
+accuracy = accuracy_score(y_test, y_pred)
+print("\nTensorFlow Model Accuracy:", accuracy)
+print("\nTensorFlow Model Classification Report:\n", classification_report(y_test, y_pred))
+print("\nTensorFlow Model Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
 
