@@ -1,0 +1,45 @@
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+
+# Load the data
+data = pd.read_csv('train.csv')  # Make sure train.csv is in your working directory
+
+data['Age'].fillna(data['Age'].median(), inplace=True)
+data['Embarked'].fillna(data['Embarked'].mode()[0], inplace=True)
+data['Fare'].fillna(data['Fare'].median(), inplace=True)
+
+# Drop columns we won't use
+data.drop(['Cabin', 'Ticket', 'Name', 'PassengerId'], axis=1, inplace=True)
+
+label_encoders = {}
+for col in ['Sex', 'Embarked']:
+    le = LabelEncoder()
+    data[col] = le.fit_transform(data[col])
+    label_encoders[col] = le
+
+
+X = data.drop('Survived', axis=1).values
+y = data['Survived'].values
+
+scaler = StandardScaler()
+X = scaler.fit_transform(X)
+
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+
+model = Sequential()
+model.add(Dense(64, activation='relu', input_shape=(X_train.shape[1],)))
+model.add(Dropout(0.3))
+model.add(Dense(32, activation='relu'))
+model.add(Dropout(0.3))
+model.add(Dense(1, activation='sigmoid'))  # Binary classification
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_val, y_val))
+
+
+loss, accuracy = model.evaluate(X_val, y_val)
+print(f"Validation Accuracy: {accuracy * 100:.2f}%")
