@@ -1,1 +1,33 @@
+import pandas as pd
+from pycaret.classification import *
+from catboost import CatBoostClassifier
+from tqdm import tqdm
+
+# Load the Titanic dataset
+df = pd.read_csv("train.csv")
+
+# Preprocess just a little to keep it funny but functional
+df = df.drop(columns=["Cabin", "Name", "Ticket", "PassengerId"])
+df["Age"].fillna(df["Age"].median(), inplace=True)
+df["Embarked"].fillna("S", inplace=True)
+
+# Optional: use tqdm to pretend we're really doing stuff
+for _ in tqdm(range(3), desc="Polishing the iceberg 🧊"):
+    df["AgeBucket"] = pd.cut(df["Age"], bins=4, labels=["Young", "Adult", "Mature", "Senior"])
+
+# Use PyCaret (AutoML magic begins)
+s = setup(data=df, target='Survived', session_id=42, silent=True, verbose=False)
+
+# Add some flair: try CatBoost (it loves categoricals)
+model = create_model('catboost')
+
+# Train it like it's 1912
+tuned_model = tune_model(model)
+final_model = finalize_model(tuned_model)
+
+# Predict on the same data just for laughs
+preds = predict_model(final_model, data=df)
+
+# Show off
+print(preds[["Survived", "Label", "Score"]].head())
 
